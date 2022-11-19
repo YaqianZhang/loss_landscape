@@ -21,7 +21,7 @@ def main():
     base_path = '..'
 
     seed = torch.randint(1000000, (1, ))
-    # seed = 1997
+    seed = 1997
     print(f"Seed: {seed}")
     torch.manual_seed(seed)
 
@@ -30,7 +30,7 @@ def main():
     parser.add_argument('models', nargs=3,
                         help="Three models that define the plane, stored at ./models/{data}/")
     parser.add_argument('--data', default='mnist',
-                        choices=['mnist', 'cifar', 'min'])
+                        choices=['mnist', 'cifar','cifar100', 'min'])
     parser.add_argument('--tasks', default="12", help="Which tasks to use")
     parser.add_argument('--size', type=int, default=0,
                         help="Size of (task) test set, 0 is full set")
@@ -63,8 +63,12 @@ def main():
 
     for path in args.path:
         path_xy = []
-        model_path = sorted(os.listdir(f"{base_path}/models/{args.data}/{path}/"), key=lambda n: int(n[6:-3]))
+        files = os.listdir(f"{base_path}/models/{args.data}/{path}/")
+        #print(files)
+        #model_path = sorted(os.listdir(f"{base_path}/models/{args.data}/{path}/"), key=lambda n: int(n[6:-3]))
+        model_path = sorted(files, key=lambda n: int(n[6:7])*10000+int(n[8:-3]))
         for model in model_path:
+            #print(model)
             model = cl.build_model(f"{base_path}/models/{args.data}/{path}/{model}", args.data)
             x, y = plane.project_onto_plane(cl.flatten_parameters(model))
             path_xy.append([x, y])
@@ -76,6 +80,9 @@ def main():
     elif args.data == "cifar":
         data = cl.get_split_cifar10(tasks=args.tasks)
         inter_model = cl.get_resnet18()
+    elif args.data == "cifar100":
+        data = cl.get_split_cifar100(tasks=args.tasks)
+        inter_model = cl.get_resnet18(100)
     elif args.data == "min":
         data = cl.get_split_mini_imagenet(tasks=args.tasks)
         inter_model = cl.get_resnet18(100, (3, 84, 84))

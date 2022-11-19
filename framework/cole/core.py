@@ -5,6 +5,7 @@ import torch.utils.data
 import torchvision
 import pickle
 import random
+import pathlib
 from cole.helper import *
 
 __BASE_DATA_PATH = '../data'
@@ -103,20 +104,79 @@ def get_split_cifar10(tasks=None, joint=False):
     return make_split_dataset(train_set, test_set, joint, tasks, transform)
 
 
+def get_split_cifar100(tasks=None, joint=False):
+    """
+    Get split version of the CIFAR 10 dataset.
+    :param tasks: int or list with task indices. Task 1 has labels 0 and 1, etc.
+    :param joint: Concatenate tasks in joint dataset
+    :return: DataSplit object with train, test en validation members.
+    """
+    if tasks is None:
+        tasks = [i for i in range(20)]
+    if type(tasks) is int:
+        tasks = [tasks]
+
+    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                torchvision.transforms.Normalize((0.1307,), (0.3081,))])
+
+    train_set = torchvision.datasets.CIFAR100(__BASE_DATA_PATH, train=True, download=True)
+    test_set = torchvision.datasets.CIFAR100(__BASE_DATA_PATH, train=False, download=True)
+
+    return make_split_dataset_cifar100(train_set, test_set, joint, tasks, transform)
 # TODO: Merge with other datasets getters, use task label file for other datasets too. Refactor reader.
 
-def get_split_mini_imagenet(tasks=None, nb_tasks=20):
+def shuffle_data(x, y):
+    perm_inds = np.arange(0, x.shape[0])
+    np.random.shuffle(perm_inds)
+    rdm_x = x[perm_inds]
+    rdm_y = y[perm_inds]
+    return rdm_x, rdm_y
+
+TEST_SPLIT = 1 / 6
+def get_split_mini_imagenet(tasks=None, nb_tasks=10):
 
     if tasks is None:
         tasks = [i for i in range(1, nb_tasks+1)]
     if type(tasks) is int:
         tasks = [tasks]
 
-    with open(f"{__BASE_DATA_PATH}/miniImageNet/miniImageNet.pkl", "rb") as f:
-        dataset = pickle.load(f)
+    train_in = open("../data/mini_imagenet/mini-imagenet-cache-train.pkl", "rb")
+    train = pickle.load(train_in)
+    train_x = train["image_data"].reshape([64, 600, 84, 84, 3])
 
+    test_in = open("../data/mini_imagenet/mini-imagenet-cache-test.pkl", "rb")
+    test = pickle.load(test_in)
+    test_x = test["image_data"].reshape([20, 600, 84, 84, 3])
+    val_in = open("../data/mini_imagenet/mini-imagenet-cache-val.pkl", "rb")
+    val = pickle.load(val_in)
+    val_x = val["image_data"].reshape([16, 600, 84, 84, 3])
+    all_data = np.vstack((train_x, val_x, test_x))
+    train_data = []
+    train_label = []
+    test_data = []
+    test_label = []
+    for i in range(len(all_data)):
+        cur_x = all_data[i]
+        cur_y = np.ones((600,)) * i
+        rdm_x, rdm_y = shuffle_data(cur_x, cur_y)
+        x_test = rdm_x[: int(600 * TEST_SPLIT)]
+        y_test = rdm_y[: int(600 * TEST_SPLIT)]
+        x_train = rdm_x[int(600 * TEST_SPLIT):]
+        y_train = rdm_y[int(600 * TEST_SPLIT):]
+        train_data.append(x_train)
+        train_label.append(y_train)
+        test_data.append(x_test)
+        test_label.append(y_test)
+    train_x= np.concatenate(train_data)
+    train_y = np.concatenate(train_label).astype(int)
+    test_x = np.concatenate(test_data)
+    test_y= np.concatenate(test_label).astype(int)
+    # with open(f"{__BASE_DATA_PATH}/miniImageNet/miniImageNet.pkl", "rb") as f:
+    #     dataset = pickle.load(f)
+    #
     task_labels = []
-    with open(f"{__BASE_DATA_PATH}/miniImageNet/split_{nb_tasks}", "r") as f:
+    #with open("../data/miniimagenet_split_20.txt", "r") as f:
+    with open("../data/miniimagenet_split_20.txt", "r") as f:
         counter = 1
         while True:
             line = f.readline()
@@ -126,17 +186,21 @@ def get_split_mini_imagenet(tasks=None, nb_tasks=20):
                 task_labels.append([int(e) for e in line.rstrip().split(" ")])
             counter += 1
 
-    train_x, test_x = [], []
-    train_y, test_y = [], []
+    # train_x, test_x = [], []
+    # train_y, test_y = [], []
+    #
+    # for i in range(0, len(dataset["labels"]), 600):
+    #     train_x.extend(dataset["data"][i:i + 500])
+    #     test_x.extend(dataset["data"][i + 500:i + 600])
+    #     train_y.extend(dataset["labels"][i:i + 500])
+    #     test_y.extend(dataset["labels"][i + 500:i + 600])
 
-    for i in range(0, len(dataset["labels"]), 600):
-        train_x.extend(dataset["data"][i:i + 500])
-        test_x.extend(dataset["data"][i + 500:i + 600])
-        train_y.extend(dataset["labels"][i:i + 500])
-        test_y.extend(dataset["labels"][i + 500:i + 600])
 
-    train_x, test_x = np.array(train_x), np.array(test_x)
-    train_y, test_y = np.array(train_y), np.array(test_y)
+
+    # train_x, test_x = np.array(train_x), np.array(test_x)
+    # train_y, test_y = np.array(train_y), np.array(test_y)
+    # print(train_x.shape,test_x.shape)
+    # assert False
 
     train_ds, test_ds = [], []
     for labels in task_labels:

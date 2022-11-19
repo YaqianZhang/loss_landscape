@@ -17,6 +17,8 @@ def build_model(path, data='mnist', device='cpu'):
         model = get_resnet18()
     elif data == "min":
         model = get_resnet18(100, (3, 84, 84))
+    elif data == "cifar100":
+        model = get_resnet18(100,)
     else:
         raise ValueError(f"Unknown model, got {data}")
 

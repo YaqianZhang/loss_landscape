@@ -12,3 +12,4 @@ results/
 *.pkl
 graphics/
 data/results/
+data*

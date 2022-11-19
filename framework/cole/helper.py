@@ -111,7 +111,7 @@ def make_split_dataset(train, test, joint=False, tasks=None, transform=None):
 
     train_ds, test_ds = [], []
 
-    task_labels = [[(t-1)*2, (t-1)*2 + 1] for t in tasks]
+    task_labels = [[(t-1)*2, (t-1)*2 + 1] for t in tasks]  ############ every two classes in a task
     if joint:
         task_labels = [[label for task in task_labels for label in task]]
 
@@ -126,6 +126,36 @@ def make_split_dataset(train, test, joint=False, tasks=None, transform=None):
     train_ds = [XYDataset(x[0], x[1], transform=transform) for x in train_ds]
     val_ds = [XYDataset(x[0], x[1], transform=transform) for x in val_ds]
     test_ds = [XYDataset(x[0], x[1], transform=transform) for x in test_ds]
+
+
+    return DataSplit(train_ds, val_ds, test_ds)
+
+def make_split_dataset_cifar100(train, test, joint=False, tasks=None, transform=None):
+    train_x, train_y = np.array(train.data), np.array(train.targets)
+    test_x, test_y = np.array(test.data), np.array(test.targets)
+
+    train_ds, test_ds = [], []
+
+    task_labels = [[(t-1)*5,
+                    (t-1)*5 + 1,
+                    (t-1)*5 + 2,
+                    (t-1)*5 + 3,
+                    (t-1)*5 + 4] for t in tasks]  ############ every two classes in a task
+    if joint:
+        task_labels = [[label for task in task_labels for label in task]]
+
+    for labels in task_labels:
+        train_label_idx = [y in labels for y in train_y]
+        test_label_idx = [y in labels for y in test_y]
+        train_ds.append((train_x[train_label_idx], train_y[train_label_idx]))
+        test_ds.append((test_x[test_label_idx], test_y[test_label_idx]))
+
+    train_ds, val_ds = make_valid_from_train(train_ds)
+
+    train_ds = [XYDataset(x[0], x[1], transform=transform) for x in train_ds]
+    val_ds = [XYDataset(x[0], x[1], transform=transform) for x in val_ds]
+    test_ds = [XYDataset(x[0], x[1], transform=transform) for x in test_ds]
+
 
     return DataSplit(train_ds, val_ds, test_ds)
 
